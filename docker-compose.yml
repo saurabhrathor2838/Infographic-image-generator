@@ -1,0 +1,55 @@
+# =============================================================================
+# AI Visual Generator — docker-compose.yml
+# =============================================================================
+# Phase 1: Defines the backend and frontend services with basic
+#          development configuration.  Real providers and databases
+#          are added in later phases.
+# =============================================================================
+
+name: ai-visual-generator
+
+services:
+  # ── Backend ───────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aigv-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./generated_images:/app/generated_images
+      - ./storage:/app/storage
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - aigv-network
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aigv-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - aigv-network
+
+networks:
+  aigv-network:
+    driver: bridge
