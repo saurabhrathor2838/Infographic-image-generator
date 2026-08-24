@@ -96,7 +96,7 @@ INFOGRAPHIC AGENT   COMPLEXITY AGENT
 - **Image generation**: OpenAI DALL·E, Stability AI, AWS Bedrock, or local pipelines
 - **Storage**: Local filesystem, S3, GCS, or Azure Blob
 
-## Current Phase: Phase 2 — Backend MVP
+## Current Phase: Phase 3 — Frontend MVP
 
 ✅ Project structure created (Phase 1)
 ✅ Backend FastAPI app with health endpoint (Phase 1)
@@ -108,12 +108,17 @@ INFOGRAPHIC AGENT   COMPLEXITY AGENT
 ✅ `.gitignore` configured (Phase 1)
 ✅ Docker Compose configuration (Phase 1)
 ✅ 20 tests (4 health check + 16 generation API tests), all passing (Phase 2)
+✅ Frontend connected to backend via `POST /api/generate` (Phase 3)
+✅ Prompt input, visual-type selector (Infographic / Complexity Image), and complexity selector (Low / Medium / High) (Phase 3)
+✅ Generate button wired to the API with loading, error, and response/status display (Phase 3)
+✅ Production build (`next build`) compiles with no type or lint errors (Phase 3)
 
-> **Note:** Image generation is **mocked** for Phase 2. No paid AI APIs are
+> **Note:** Image generation is **mocked** for Phases 2–3. No paid AI APIs are
 > called. The `/api/generate` endpoint processes requests through the agentic
 > workflow (Planner → Router → Specialist) and returns a plan and routing
-> decision, but no actual image is produced. Real image generation is
-> deferred to Phase 4+.
+> decision, but no actual image is produced. The Front MVP displays this
+> response (request id, status, routing, plan, and mock flag) in a clean,
+> responsive UI. Real image generation is deferred to Phase 4+.
 
 ### API Endpoints
 
@@ -164,7 +169,7 @@ Response:
 |-------|-------------|--------|
 | 1 | Project initialization + GitHub | ✅ Complete |
 | 2 | Backend MVP | ✅ Complete |
-| 3 | Frontend MVP | 🔄 Planned |
+| 3 | Frontend MVP | ✅ Complete |
 | 4 | Image generation provider | 🔄 Planned |
 | 5 | Planner / Router Agent | 🔄 Planned |
 | 6 | Infographic Agent | 🔄 Planned |

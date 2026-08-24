@@ -74,6 +74,12 @@ storage/*
 .terraform/
 *.tfstate*
 
+# TypeScript build info
+*.tsbuildinfo
+
+# Poolside agent tooling / local settings
+.poolside/
+
 # Misc
 *.tmp
 *.bak

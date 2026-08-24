@@ -1,34 +1,163 @@
 /**
- * ResultArea component — placeholder for the generated image.
+ * ResultArea component — displays the outcome of a generation request.
  *
- * In Phase 1 this displays a placeholder.  In later phases it will render
- * the actual generated image (or a gallery of revisions).
+ * Phase 3: renders the structured response returned by ``POST /api/generate``
+ * (request id, status badge, routing, plan, etc.) as well as a clear error
+ * message when the request fails.  Real image rendering is deferred to
+ * Phase 4+, so the ``imageUrl`` prop is preserved for forward-compatibility.
  */
+
+import type { GenerationResponse } from "@/types/api";
 
 interface ResultAreaProps {
   imageUrl: string | null;
   loading: boolean;
-  message: string;
+  error: string | null;
+  response: GenerationResponse | null;
+  visualType: string;
+  complexity: string;
 }
 
 export default function ResultArea({
   imageUrl,
   loading,
-  message,
+  error,
+  response,
+  visualType,
+  complexity,
 }: ResultAreaProps) {
+  // ── Loading ────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="result-area">
+        <div className="result-placeholder">
+          <div className="spinner spinner-centered" />
+          <p className="result-text">Generating your visual…</p>
+          <p className="result-message">
+            The backend is processing your request through the agentic
+            workflow.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error ──────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="result-area">
+        <div className="result-placeholder result-error">
+          <div className="result-icon">⚠️</div>
+          <p className="result-text">Generation failed.</p>
+          <p className="result-message error-message">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Success — API response ────────────────────────────────────────────
+  if (response) {
+    const { request_id, status, visual_type, message, result } = response;
+    const isComplete = status === "complete";
+    const routing = result?.routing ?? "—";
+    const plan = result?.plan;
+    const createdAt = result?.created_at
+      ? new Date(result.created_at).toLocaleString()
+      : "—";
+    const updatedAt = result?.updated_at
+      ? new Date(result.updated_at).toLocaleString()
+      : "—";
+
+    return (
+      <div className="result-area">
+        <div className="response-panel">
+          <div className="response-header">
+            <span
+              className={
+                "status-badge " +
+                (isComplete ? "status-complete" : "status-pending")
+              }
+            >
+              {status}
+            </span>
+            {result?.mock === true && (
+              <span className="mock-badge">Mocked</span>
+            )}
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Request ID</span>
+            <span className="response-value" title={request_id}>
+              {request_id}
+            </span>
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Visual Type</span>
+            <span className="response-value">
+              {visual_type || visualType || "—"}
+            </span>
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Complexity</span>
+            <span className="response-value">
+              {result?.complexity || complexity || "—"}
+            </span>
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Routing</span>
+            <span className="response-value">{routing}</span>
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Iterations</span>
+            <span className="response-value">{result?.iterations ?? 0}</span>
+          </div>
+
+          <div className="response-field">
+            <span className="response-label">Image Generated</span>
+            <span className="response-value">
+              {result?.final_image ? "Yes" : "No (mocked for Phase 3)"}
+            </span>
+          </div>
+
+          {message && <p className="response-message">{message}</p>}
+
+          {plan && (
+            <details className="plan-details">
+              <summary>View generation plan</summary>
+              <pre className="plan-json">
+                {JSON.stringify(plan, null, 2)}
+              </pre>
+            </details>
+          )}
+
+          <div className="response-timestamps">
+            <span>Created: {createdAt}</span>
+            <span>Updated: {updatedAt}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Empty placeholder ──────────────────────────────────────────────────
+  if (imageUrl) {
+    return (
+      <div className="result-area">
+        <img src={imageUrl} alt="Generated visual" className="result-image" />
+      </div>
+    );
+  }
+
   return (
     <div className="result-area">
-      {imageUrl ? (
-        <img src={imageUrl} alt="Generated visual" className="result-image" />
-      ) : (
-        <div className="result-placeholder">
-          <div className="result-icon">🖼️</div>
-          <p className="result-text">
-            {loading ? "Generating your visual..." : "Your generated image will appear here."}
-          </p>
-          {message && <p className="result-message">{message}</p>}
-        </div>
-      )}
+      <div className="result-placeholder">
+        <div className="result-icon">🖼️</div>
+        <p className="result-text">Your generated image will appear here.</p>
+      </div>
     </div>
   );
 }

@@ -395,6 +395,156 @@ body {
   margin-top: 1rem;
 }
 
+/* ── Spinner (centered) ───────────────────────────────────────────────────── */
+
+.spinner-centered {
+  margin-bottom: 0.75rem;
+}
+
+/* ── Result error ─────────────────────────────────────────────────────────── */
+
+.result-error .result-icon {
+  color: var(--color-danger);
+}
+
+.error-message {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* ── Response Panel ───────────────────────────────────────────────────────── */
+
+.response-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.response-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-success);
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+}
+
+.mock-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--color-text-secondary);
+}
+
+.response-field {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  align-items: baseline;
+}
+
+.response-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.response-value {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  word-break: break-word;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.response-message {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Plan details (collapsible) ──────────────────────────────────────────── */
+
+.plan-details {
+  margin-top: 0.25rem;
+}
+
+.plan-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  list-style: none;
+  padding: 0.25rem 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.plan-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan-details summary::before {
+  content: "▼";
+  display: inline-block;
+  font-size: 0.65rem;
+  transition: transform 0.2s ease;
+}
+
+.plan-details[open] summary::before {
+  transform: rotate(-90deg);
+}
+
+.plan-json {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  overflow-x: auto;
+}
+
+/* ── Timestamps ──────────────────────────────────────────────────────────── */
+
+.response-timestamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {

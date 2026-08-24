@@ -4,13 +4,20 @@
  * Combines the Header, PromptArea, VisualTypeSelector, ComplexitySelector,
  * GenerateButton, and ResultArea into a single-page generation interface.
  *
- * Phase 1: The Generate button shows a loading state and then displays a
- * placeholder.  Real image generation is deferred to later phases.
+ * Phase 3: The Generate button is connected to the backend
+ * ``POST /api/generate`` endpoint.  On submit the frontend sends the prompt,
+ * visual type and complexity to the API, then displays the structured plan,
+ * routing decision and request status returned by the backend.
+ *
+ * Real image generation is **not** implemented in this phase — the backend
+ * returns a mocked result and the ResultArea renders the API response.
  */
 
 "use client";
 
 import { useState, useEffect } from "react";
+
+import type { GenerationResponse, HealthResponse } from "@/types/api";
 
 import Header from "@/components/Header";
 import PromptArea from "@/components/PromptArea";
@@ -29,23 +36,29 @@ export default function Home() {
   const [visualType, setVisualType] = useState<VisualType>("auto");
   const [complexity, setComplexity] = useState<Complexity>("medium");
 
-  // ── UI state ──────────────────────────────────────────────────────────
+  // ── API / UI state ─────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [response, setResponse] = useState<GenerationResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState("");
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
 
   // ── Health check on mount ─────────────────────────────────────────────
   useEffect(() => {
     async function checkHealth() {
       try {
-        const res = await fetch("/api/health");
+        const res = await fetch("/api/health", { cache: "no-store" });
         if (res.ok) {
-          setMessage("Backend connected ✅");
+          const data: HealthResponse = await res.json();
+          setBackendConnected(true);
+          setStatusText(`Backend connected · ${data.service}`);
         } else {
-          setMessage("Backend unreachable ⚠️");
+          setBackendConnected(false);
+          setStatusText("Backend reachable but unhealthy");
         }
       } catch {
-        setMessage("Backend not connected — running in standalone mode");
+        setBackendConnected(false);
+        setStatusText("Backend not connected — running in standalone mode");
       }
     }
     checkHealth();
@@ -54,23 +67,69 @@ export default function Home() {
   // ── Generate handler ──────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      setMessage("Please enter a prompt first.");
+      setError("Please enter a prompt first.");
       return;
     }
 
     setIsGenerating(true);
-    setMessage("Preparing generation workflow...");
+    setError(null);
+    setResponse(null);
+    setStatusText("Sending request to backend...");
 
-    // Phase 1: simulate a brief loading state, then show placeholder.
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          visual_type: visualType,
+          complexity,
+        }),
+        cache: "no-store",
+      });
 
-    setMessage(
-      "Image generation is not yet implemented in Phase 1. " +
-        "This result area will display generated images in a future phase."
-    );
-    setImageUrl(null);
-    setIsGenerating(false);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // 422 validation error or other HTTP error from the backend.
+        setError(formatError(res.status, data));
+        return;
+      }
+
+      setResponse(data as GenerationResponse);
+      setStatusText("");
+    } catch (err: unknown) {
+      // Network error — the backend is unreachable.
+      const message = err instanceof Error ? err.message : String(err);
+      setError(
+        `Network error — could not reach the backend. (${message})`
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+  /** Build a friendly, human-readable error string from a failed response. */
+  function formatError(status: number, data: unknown): string {
+    if (status === 422) {
+      // FastAPI validation error: { detail: [{ loc, msg, type }, ...] }
+      if (Array.isArray((data as { detail?: unknown })?.detail)) {
+        const details = (data as { detail: { msg?: string }[] }).detail
+          .map((d) => d.msg || "validation error")
+          .join("; ");
+        return `Validation error: ${details}.`;
+      }
+      return "Validation error — please check your input.";
+    }
+
+    const api = data as { message?: string; error?: string; detail?: string };
+    const summary =
+      api?.message ||
+      api?.error ||
+      api?.detail ||
+      `Request failed with status ${status}`;
+    return `Generation failed (${status}): ${summary}`;
+  }
 
   return (
     <div className="page-wrapper">
@@ -106,7 +165,17 @@ export default function Home() {
                 disabled={!prompt.trim() || isGenerating}
                 loading={isGenerating}
               />
-              {message && <p className="status-message">{message}</p>}
+
+              {/* Transient status / connectivity message */}
+              {statusText && (
+                <p
+                  className={`status-message ${
+                    backendConnected ? "positive" : "negative"
+                  }`}
+                >
+                  {statusText}
+                </p>
+              )}
             </div>
           </section>
 
@@ -114,9 +183,12 @@ export default function Home() {
           <section className="result-section">
             <h2 className="section-title">Result</h2>
             <ResultArea
-              imageUrl={imageUrl}
+              imageUrl={null}
               loading={isGenerating}
-              message={message}
+              error={error}
+              response={response}
+              visualType={visualType}
+              complexity={complexity}
             />
           </section>
         </div>
