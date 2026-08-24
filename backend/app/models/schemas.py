@@ -37,7 +37,7 @@ class GenerationType(str, Enum):
     """Which generation strategy the router selected."""
 
     INFOGRAPHIC = "infographic"
-    COMPLEXITY = "complexity_image"
+    COMPLEXITY = "complexity"
 
 
 class GenerationStatus(str, Enum):

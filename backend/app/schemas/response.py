@@ -31,17 +31,18 @@ class HealthResponse(BaseResponse):
 # ── Generation ─────────────────────────────────────────────────────────────────
 
 class GenerationResponse(BaseResponse):
-    """Response returned when a generation request is accepted."""
+    """Response returned when a generation request is accepted and processed."""
 
     request_id: str = Field(..., description="Unique identifier for the generation request.")
-    status: str = Field(..., description="Initial status of the generation.")
+    status: str = Field(..., description="Status of the generation (e.g. 'complete', 'failed').")
+    visual_type: str = Field(..., description="The type of visual requested (e.g. 'infographic', 'complexity_image', 'auto').")
     message: str = Field(
         default="Generation request accepted. You can poll for status updates.",
-        description="Human-readable message.",
+        description="Human-readable message describing the current state.",
     )
     result: Optional[dict[str, Any]] = Field(
         default=None,
-        description="Result data, if available (None while generation is in progress).",
+        description="Additional result data (plan, routing, metrics, etc.).",
     )
 
 

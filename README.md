@@ -96,24 +96,74 @@ INFOGRAPHIC AGENT   COMPLEXITY AGENT
 - **Image generation**: OpenAI DALL·E, Stability AI, AWS Bedrock, or local pipelines
 - **Storage**: Local filesystem, S3, GCS, or Azure Blob
 
-## Current Phase: Phase 1 — Project Initialization
+## Current Phase: Phase 2 — Backend MVP
 
-✅ Project structure created
-✅ Backend FastAPI app with health endpoint
-✅ Frontend Next.js UI skeleton with professional design
-✅ Agent architecture skeletons with clean interfaces
-✅ Provider abstractions (TextGenerator, ImageGenerator, StorageProvider)
-✅ `.env.example` with placeholder configuration
-✅ `.gitignore` configured
-✅ Docker Compose configuration
-✅ Initial tests for the health endpoint
+✅ Project structure created (Phase 1)
+✅ Backend FastAPI app with health endpoint (Phase 1)
+✅ `POST /api/generate` endpoint with validation and error handling (Phase 2)
+✅ Frontend Next.js UI skeleton with professional design (Phase 1)
+✅ Agent architecture skeletons with clean interfaces (Phase 1)
+✅ Provider abstractions (TextGenerator, ImageGenerator, StorageProvider) (Phase 1)
+✅ `.env.example` with placeholder configuration (Phase 1)
+✅ `.gitignore` configured (Phase 1)
+✅ Docker Compose configuration (Phase 1)
+✅ 20 tests (4 health check + 16 generation API tests), all passing (Phase 2)
+
+> **Note:** Image generation is **mocked** for Phase 2. No paid AI APIs are
+> called. The `/api/generate` endpoint processes requests through the agentic
+> workflow (Planner → Router → Specialist) and returns a plan and routing
+> decision, but no actual image is produced. Real image generation is
+> deferred to Phase 4+.
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check — returns service status. |
+| GET | `/docs` | Interactive API documentation (Swagger UI). |
+| POST | `/api/generate` | Submit a visual generation request. |
+
+#### POST /api/generate
+
+Request body:
+
+```json
+{
+    "prompt": "Create an infographic about the benefits of solar energy.",
+    "visual_type": "infographic",
+    "complexity": "medium"
+}
+```
+
+`visual_type` accepts: `auto`, `infographic`, `complexity_image` (defaults to `auto`).
+`complexity` accepts: `low`, `medium`, `high` (defaults to `medium`).
+
+Response:
+
+```json
+{
+    "success": true,
+    "timestamp": "2026-01-01T12:00:00Z",
+    "request_id": "uuid-v4",
+    "status": "complete",
+    "visual_type": "infographic",
+    "message": "Visual plan created and routed to the 'infographic' agent. Image generation is mocked for Phase 2.",
+    "result": {
+        "routing": "infographic",
+        "plan": { ... },
+        "iterations": 0,
+        "final_image": null,
+        "mock": true
+    }
+}
+```
 
 ## Development Phases
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Project initialization + GitHub | ✅ Complete |
-| 2 | Backend MVP | 🔄 Planned |
+| 2 | Backend MVP | ✅ Complete |
 | 3 | Frontend MVP | 🔄 Planned |
 | 4 | Image generation provider | 🔄 Planned |
 | 5 | Planner / Router Agent | 🔄 Planned |
