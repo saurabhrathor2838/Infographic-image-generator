@@ -13,6 +13,18 @@ from app.models.schemas import (
     VisualRequest,
     VisualType,
 )
+from app.models.visual_spec import (
+    Arrow,
+    Connection,
+    Layout,
+    Node,
+    Section,
+    Shape,
+    ShapeType,
+    TextAlign,
+    TextElement,
+    VisualSpecification,
+)
 
 __all__ = [
     "Complexity",
@@ -24,4 +36,14 @@ __all__ = [
     "ImagePrompt",
     "VisualRequest",
     "VisualType",
+    "Arrow",
+    "Connection",
+    "Layout",
+    "Node",
+    "Section",
+    "Shape",
+    "ShapeType",
+    "TextAlign",
+    "TextElement",
+    "VisualSpecification",
 ]
