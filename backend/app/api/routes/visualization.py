@@ -1,38 +1,49 @@
 """
-Visualization endpoints.
-
-Exposes the programmatic SVG renderer over HTTP so that a client can submit a
-:class:`~app.models.visual_spec.VisualSpecification` (or request a bundled
-sample) and receive a rendered SVG document back.
+Visualization + AI-planning endpoints.
 
 Endpoints
 ---------
-- ``POST /api/render``                 — render an arbitrary specification.
-- ``GET  /api/samples/water-cycle``    — render the built-in "Water Cycle" sample.
-- ``GET  /api/samples/water-cycle/spec`` — return the "Water Cycle" spec as JSON.
+- ``POST /api/render``               — render a caller-supplied specification.
+- ``POST /api/plan``                 — turn a natural-language prompt into a
+  specification via the :class:`~app.agents.visual_planner.VisualPlannerAgent`
+  and return the rendered SVG (LLM provider injected via ``get_text_generator``).
+- ``GET  /api/samples/water-cycle``  — render the bundled sample as SVG.
+- ``GET  /api/samples/water-cycle/spec`` — return the sample spec as JSON.
 
-No AI model or paid service is involved — rendering is fully deterministic
-from the specification JSON.
+No paid API is invoked here; the LLM client is injected (and therefore
+mockable in tests).  When no provider is configured, ``/api/plan`` responds
+``503`` instead of failing hard.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from app.agents.base import AgentContext
+from app.agents.visual_planner import VisualPlannerAgent
+from app.core.exceptions import AppError
+from app.models.schemas import VisualRequest
 from app.models.visual_spec import VisualSpecification
+from app.providers.factory import get_text_generator
+from app.providers.text_generator import TextGenerator
 from app.renderers.svg_renderer import SVGRenderer
 from app.samples import water_cycle, water_cycle_spec
+from app.schemas.request import GenerationRequest
 
 router: APIRouter = APIRouter()
 
 
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
 def _render(spec: VisualSpecification) -> Response:
-    """Render *spec* to SVG and wrap it in a 200 response."""
+    """Render *spec* to an SVG ``Response``."""
     svg = SVGRenderer().render(spec)
     return Response(content=svg, media_type="image/svg+xml")
 
+
+# ── Render a caller-supplied specification ───────────────────────────────────
 
 @router.post(
     "/render",
@@ -41,15 +52,74 @@ def _render(spec: VisualSpecification) -> Response:
     summary="Render a VisualSpecification to SVG",
     description=(
         "Accepts a validated ``VisualSpecification`` JSON body, renders it to an "
-        "SVG document, and returns the SVG (content-type ``image/svg+xml``). "
-        "No AI or paid provider is used."
+        "SVG document, and returns the SVG (content-type ``image/svg+xml``)."
     ),
     response_description="An SVG document representing the specification.",
 )
 async def render_visual(spec: VisualSpecification) -> Response:
-    """Render a user-supplied :class:`VisualSpecification` as SVG."""
     return _render(spec)
 
+
+# ── Plan + render from a natural-language prompt ────────────────────────────
+
+@router.post(
+    "/plan",
+    response_class=Response,
+    status_code=200,
+    summary="Plan a visual from a prompt and render it to SVG",
+    description=(
+        "Accepts a natural-language prompt (plus optional visual_type and "
+        "complexity), uses the AI Planner Agent to produce a validated "
+        "``VisualSpecification``, renders it to SVG, and returns the SVG "
+        "(content-type ``image/svg+xml``). The LLM provider is injected via "
+        "``get_text_generator`` and is configurable through environment "
+        "variables. Returns 503 when no provider is configured, 502 when the "
+        "LLM output cannot be turned into a valid specification."
+    ),
+    response_description="An SVG document produced from the planned specification.",
+    responses={
+        502: {"description": "Planning failed (invalid/empty AI output)."},
+        503: {"description": "LLM provider not configured."},
+    },
+)
+async def plan_and_render(
+    request: GenerationRequest,
+    text_generator: Optional[TextGenerator] = Depends(get_text_generator),
+) -> Response:
+    if text_generator is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "LLM provider not configured. Set ai_provider=openai and "
+                "OPENAI_API_KEY in the environment."
+            ),
+        )
+
+    planner = VisualPlannerAgent(text_generator=text_generator)
+    visual_request = VisualRequest(
+        prompt=request.prompt,
+        visual_type=request.visual_type,
+        complexity=request.complexity,
+    )
+    context = AgentContext(request=visual_request)
+
+    try:
+        result = await planner.run(context)
+    except AppError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Planning failed: {exc.message}"
+        ) from exc
+
+    if not result.success or result.data is None:
+        raise HTTPException(
+            status_code=502, detail=result.error or "Planning failed."
+        )
+
+    spec: VisualSpecification = result.data
+    return _render(spec)
+
+
+# ── Sample endpoints ──────────────────────────────────────────────────────────
 
 @router.get(
     "/samples/water-cycle",
@@ -57,10 +127,8 @@ async def render_visual(spec: VisualSpecification) -> Response:
     status_code=200,
     summary="Render the 'Water Cycle' sample infographic",
     description="Returns the SVG for the bundled Water Cycle sample infographic.",
-    response_description="An SVG document for the Water Cycle infographic.",
 )
 async def sample_water_cycle() -> Response:
-    """Render the built-in Water Cycle sample as SVG."""
     return _render(water_cycle())
 
 
@@ -72,5 +140,4 @@ async def sample_water_cycle() -> Response:
     description="Returns the raw JSON of the Water Cycle sample specification.",
 )
 async def sample_water_cycle_spec() -> Dict[str, Any]:
-    """Return the Water Cycle specification as a JSON-serialisable dict."""
     return water_cycle_spec()
