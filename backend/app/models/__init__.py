@@ -25,6 +25,7 @@ from app.models.visual_spec import (
     TextElement,
     VisualSpecification,
 )
+from app.models.quality_report import QualityReport
 
 __all__ = [
     "Complexity",
@@ -46,4 +47,5 @@ __all__ = [
     "TextAlign",
     "TextElement",
     "VisualSpecification",
+    "QualityReport",
 ]
