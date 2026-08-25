@@ -16,6 +16,7 @@ from typing import Optional
 
 from app.core.config import settings
 from app.providers.base import ProviderConfig
+from app.providers.mock_text_generator import MockTextGenerator
 from app.providers.openai_text_generator import OpenAITextGenerator
 from app.providers.text_generator import TextGenerator
 
@@ -37,10 +38,15 @@ def text_generator_from_settings() -> Optional[TextGenerator]:
     degrade gracefully (e.g. the mocked Phase 1 path).
     """
     provider = (settings.ai_provider or "").strip().lower()
-    if provider == "openai" and settings.openai_api_key:
+    if provider == "openai":
+        if not settings.openai_api_key:
+            return None
         return OpenAITextGenerator(
             create_provider_config(provider, settings.text_model)
         )
+    if provider == "mock":
+        # Deterministic, dependency-free generator for local dev & tests.
+        return MockTextGenerator(create_provider_config("mock", None))
     return None
 
 

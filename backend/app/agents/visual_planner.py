@@ -120,10 +120,14 @@ class VisualPlannerAgent(AgentBase):
         # The full schema instructions (+ the user's request) live in the
         # system prompt; the user message is a short trigger that points the
         # model at the schema.
-        system_prompt: str = SYSTEM_PROMPT.format(
-            visual_type=request.visual_type.value,
-            complexity=request.complexity.value,
-            prompt=request.prompt,
+        # Use str.replace instead of str.format so that the literal JSON
+        # braces inside the schema description are not interpreted as format
+        # field placeholders (which raised KeyError at runtime).
+        system_prompt: str = (
+            SYSTEM_PROMPT
+            .replace("{visual_type}", request.visual_type.value)
+            .replace("{complexity}", request.complexity.value)
+            .replace("{prompt}", request.prompt)
         )
         user_message: str = (
             "Produce a single JSON object matching the VisualSpecification "

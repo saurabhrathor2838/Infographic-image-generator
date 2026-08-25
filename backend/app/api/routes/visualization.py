@@ -90,8 +90,9 @@ async def plan_and_render(
         raise HTTPException(
             status_code=503,
             detail=(
-                "LLM provider not configured. Set ai_provider=openai and "
-                "OPENAI_API_KEY in the environment."
+                "LLM provider not configured. Set AI_PROVIDER=openai and "
+                "OPENAI_API_KEY in the environment, or AI_PROVIDER=mock for "
+                "local development."
             ),
         )
 

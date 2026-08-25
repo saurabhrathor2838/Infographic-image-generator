@@ -9,8 +9,15 @@
  * visual type and complexity to the API, then displays the structured plan,
  * routing decision and request status returned by the backend.
  *
- * Real image generation is **not** implemented in this phase — the backend
- * returns a mocked result and the ResultArea renders the API response.
+ * Phase 6: When the user selects "Infographic" (or "Auto"), the request is
+ * routed to the ``POST /api/plan`` endpoint, which uses the AI Planner Agent
+ * to generate a ``VisualSpecification`` and renders it to SVG.  The SVG is
+ * displayed directly in the ResultArea.  The "Complexity Image" flow remains
+ * unchanged (still uses the mocked ``/api/generate`` endpoint).
+ *
+ * No paid image-generation APIs are used — the LLM provider is injected via
+ * FastAPI dependency injection and can be swapped for a mock
+ * (``AI_PROVIDER=mock``) for local development and testing.
  */
 
 "use client";
@@ -39,6 +46,7 @@ export default function Home() {
   // ── API / UI state ─────────────────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false);
   const [response, setResponse] = useState<GenerationResponse | null>(null);
+  const [svgContent, setSvgContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
   const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
@@ -74,10 +82,22 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     setResponse(null);
-    setStatusText("Sending request to backend...");
+    setSvgContent(null);
+
+    // Infographic / Auto → /api/plan (AI Planner → SVG).
+    // Complexity image → /api/generate (mocked, unchanged from Phase 3).
+    const usePlanEndpoint =
+      visualType === "infographic" || visualType === "auto";
+    const endpoint = usePlanEndpoint ? "/api/plan" : "/api/generate";
+
+    setStatusText(
+      usePlanEndpoint
+        ? "AI Planner is designing your infographic…"
+        : "Sending request to backend..."
+    );
 
     try {
-      const res = await fetch("/api/generate", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,16 +108,29 @@ export default function Home() {
         cache: "no-store",
       });
 
-      const data = await res.json().catch(() => ({}));
+      if (usePlanEndpoint) {
+        // /api/plan returns an SVG document on success (200) or a JSON
+        // error body on failure (422 / 502 / 503).
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(formatError(res.status, data));
+          return;
+        }
+        const svgText = await res.text();
+        setSvgContent(svgText);
+        setStatusText("");
+      } else {
+        // /api/generate returns JSON (existing Phase 3 behaviour).
+        const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        // 422 validation error or other HTTP error from the backend.
-        setError(formatError(res.status, data));
-        return;
+        if (!res.ok) {
+          setError(formatError(res.status, data));
+          return;
+        }
+
+        setResponse(data as GenerationResponse);
+        setStatusText("");
       }
-
-      setResponse(data as GenerationResponse);
-      setStatusText("");
     } catch (err: unknown) {
       // Network error — the backend is unreachable.
       const message = err instanceof Error ? err.message : String(err);
@@ -120,6 +153,22 @@ export default function Home() {
         return `Validation error: ${details}.`;
       }
       return "Validation error — please check your input.";
+    }
+
+    if (status === 503) {
+      const api = data as { detail?: string };
+      return (
+        api?.detail ||
+        "The AI planner is not available. Please configure an LLM provider."
+      );
+    }
+
+    if (status === 502) {
+      const api = data as { detail?: string };
+      return (
+        api?.detail ||
+        "Planning failed — the AI could not produce a valid visual specification."
+      );
     }
 
     const api = data as { message?: string; error?: string; detail?: string };
@@ -184,6 +233,7 @@ export default function Home() {
             <h2 className="section-title">Result</h2>
             <ResultArea
               imageUrl={null}
+              svgContent={svgContent}
               loading={isGenerating}
               error={error}
               response={response}

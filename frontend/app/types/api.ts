@@ -5,6 +5,10 @@
  * endpoints ``GET /api/health`` and ``POST /api/generate``.  Keeping them in
  * one place gives the frontend a single source of truth for the response
  * shape returned by the backend.
+ *
+ * The ``POST /api/plan`` endpoint (Phase 6) returns an SVG document
+ * (``image/svg+xml``) on success, or a JSON error body on failure — see
+ * ``ApiErrorResponse`` for the error shape.
  */
 
 /** Lifecycle status of a generation request (mirrors the backend enum). */
