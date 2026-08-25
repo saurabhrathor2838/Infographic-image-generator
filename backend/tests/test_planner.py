@@ -198,6 +198,76 @@ class TestPlanEndpoint:
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/svg+xml"
 
+    async def test_plan_complexity_image_returns_svg(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """``complexity_image`` visual type should also render to SVG via /api/plan."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan",
+            json={
+                "prompt": "Create a complexity image explaining cloud architecture.",
+                "visual_type": "complexity_image",
+                "complexity": "high",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        svg = response.text
+        assert svg.startswith("<svg")
+        assert svg.strip().endswith("</svg>")
+        root = ET.fromstring(svg)
+        assert root.tag.endswith("svg")
+
+    async def test_plan_low_complexity_produces_fewer_elements(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """Low complexity spec should produce a sparser SVG than high complexity."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan",
+            json={
+                "prompt": "Create an infographic explaining the water cycle.",
+                "visual_type": "complexity_image",
+                "complexity": "low",
+            },
+        )
+        assert response.status_code == 200
+        low_svg = response.text
+        low_root = ET.fromstring(low_svg)
+
+        response = await client.post(
+            "/api/plan",
+            json={
+                "prompt": "Create an infographic explaining the water cycle.",
+                "visual_type": "complexity_image",
+                "complexity": "high",
+            },
+        )
+        assert response.status_code == 200
+        high_svg = response.text
+        high_root = ET.fromstring(high_svg)
+
+        # High complexity should have strictly more rect elements (nodes+sections+shapes)
+        # and more text elements (annotations) than low complexity.
+        low_rects = len(low_root.findall(".//{http://www.w3.org/2000/svg}rect"))
+        high_rects = len(high_root.findall(".//{http://www.w3.org/2000/svg}rect"))
+        low_texts = len(low_root.findall(".//{http://www.w3.org/2000/svg}text"))
+        high_texts = len(high_root.findall(".//{http://www.w3.org/2000/svg}text"))
+
+        assert high_rects > low_rects, (
+            f"High complexity ({high_rects} rects) should have more rect elements "
+            f"than low ({low_rects})"
+        )
+        assert high_texts > low_texts, (
+            f"High complexity ({high_texts} texts) should have more text elements "
+            f"than low ({low_texts})"
+        )
+
 
 # ── MockTextGenerator unit tests ──────────────────────────────────────────────
 
@@ -272,3 +342,58 @@ class TestVisualPlannerAgentIntegration:
         result = await agent.run(ctx)
         assert result.success is False
         assert result.error is not None
+
+
+# ── Complexity scaling tests ─────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+class TestComplexityScaling:
+    """Verify that the mock generator produces denser visuals for higher complexity."""
+
+    @staticmethod
+    def _make_system_prompt(complexity: str) -> str:
+        """Build a system prompt that the mock generator can parse."""
+        return (
+            SYSTEM_PROMPT
+            .replace("{visual_type}", "complexity_image")
+            .replace("{complexity}", complexity)
+            .replace("{prompt}", "Create an infographic explaining the water cycle.")
+        )
+
+    async def test_low_complexity_produces_simple_spec(self) -> None:
+        """Low complexity → 2 nodes, 1 shape, few connections."""
+        gen = MockTextGenerator()
+        result = await gen.generate(
+            "trigger",
+            system_prompt=self._make_system_prompt("low"),
+        )
+        spec = VisualSpecification.model_validate(json.loads(result.text))
+        assert len(spec.nodes) <= 3
+        assert len(spec.shapes) <= 2
+        assert len(spec.text) <= 2
+        assert len(spec.connections) <= 2
+
+    async def test_medium_complexity_produces_moderate_spec(self) -> None:
+        """Medium complexity → 3-4 nodes, 2-3 shapes, moderate connections."""
+        gen = MockTextGenerator()
+        result = await gen.generate(
+            "trigger",
+            system_prompt=self._make_system_prompt("medium"),
+        )
+        spec = VisualSpecification.model_validate(json.loads(result.text))
+        assert 2 <= len(spec.nodes) <= 4
+        assert len(spec.shapes) >= 2
+        assert len(spec.text) >= 2
+
+    async def test_high_complexity_produces_dense_spec(self) -> None:
+        """High complexity → 6 nodes, 5 shapes, dense connections, annotations."""
+        gen = MockTextGenerator()
+        result = await gen.generate(
+            "trigger",
+            system_prompt=self._make_system_prompt("high"),
+        )
+        spec = VisualSpecification.model_validate(json.loads(result.text))
+        assert len(spec.nodes) >= 6
+        assert len(spec.shapes) >= 4
+        assert len(spec.text) >= 4
+        assert len(spec.connections) >= 5

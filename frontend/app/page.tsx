@@ -12,8 +12,12 @@
  * Phase 6: When the user selects "Infographic" (or "Auto"), the request is
  * routed to the ``POST /api/plan`` endpoint, which uses the AI Planner Agent
  * to generate a ``VisualSpecification`` and renders it to SVG.  The SVG is
- * displayed directly in the ResultArea.  The "Complexity Image" flow remains
- * unchanged (still uses the mocked ``/api/generate`` endpoint).
+ * displayed directly in the ResultArea.
+ *
+ * Phase 7: When the user selects "Complexity Image", the request is also
+ * routed to ``POST /api/plan``.  The AI Planner generates a more detailed
+ * ``VisualSpecification`` based on the selected complexity level (Low/Medium/High)
+ * and renders it to SVG.  The Complexity selector is preserved unchanged.
  *
  * No paid image-generation APIs are used — the LLM provider is injected via
  * FastAPI dependency injection and can be swapped for a mock
@@ -84,16 +88,16 @@ export default function Home() {
     setResponse(null);
     setSvgContent(null);
 
-    // Infographic / Auto → /api/plan (AI Planner → SVG).
-    // Complexity image → /api/generate (mocked, unchanged from Phase 3).
-    const usePlanEndpoint =
-      visualType === "infographic" || visualType === "auto";
-    const endpoint = usePlanEndpoint ? "/api/plan" : "/api/generate";
+    // All visual types now use the AI Planner → SVG flow (Phase 7).
+    // The Complexity selector controls the detail level of the generated spec.
+    const endpoint = "/api/plan";
 
     setStatusText(
-      usePlanEndpoint
+      visualType === "infographic"
         ? "AI Planner is designing your infographic…"
-        : "Sending request to backend..."
+        : visualType === "complexity_image"
+        ? "AI Planner is generating your complexity visualization…"
+        : "AI Planner is designing your visual…"
     );
 
     try {
@@ -108,29 +112,18 @@ export default function Home() {
         cache: "no-store",
       });
 
-      if (usePlanEndpoint) {
-        // /api/plan returns an SVG document on success (200) or a JSON
-        // error body on failure (422 / 502 / 503).
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(formatError(res.status, data));
-          return;
-        }
-        const svgText = await res.text();
-        setSvgContent(svgText);
-        setStatusText("");
-      } else {
-        // /api/generate returns JSON (existing Phase 3 behaviour).
+      if (!res.ok) {
+        // /api/plan returns a JSON error body on failure (422 / 502 / 503).
         const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          setError(formatError(res.status, data));
-          return;
-        }
-
-        setResponse(data as GenerationResponse);
-        setStatusText("");
+        setError(formatError(res.status, data));
+        return;
       }
+
+      // /api/plan returns an SVG document on success (200).
+      const svgText = await res.text();
+      setSvgContent(svgText);
+      setResponse(null);
+      setStatusText("");
     } catch (err: unknown) {
       // Network error — the backend is unreachable.
       const message = err instanceof Error ? err.message : String(err);
