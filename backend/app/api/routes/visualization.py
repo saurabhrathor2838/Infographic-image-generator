@@ -28,6 +28,7 @@ from app.models.schemas import VisualRequest
 from app.models.visual_spec import VisualSpecification
 from app.providers.factory import get_text_generator
 from app.providers.text_generator import TextGenerator
+from app.renderers.png_renderer import PNGRenderer
 from app.renderers.svg_renderer import SVGRenderer
 from app.samples import water_cycle, water_cycle_spec
 from app.schemas.request import GenerationRequest
@@ -37,8 +38,20 @@ router: APIRouter = APIRouter()
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _render(spec: VisualSpecification) -> Response:
-    """Render *spec* to an SVG ``Response``."""
+def _render(spec: VisualSpecification, *, format: str = "svg") -> Response:
+    """Render *spec* to an SVG or PNG ``Response``.
+
+    Parameters
+    ----------
+    spec:
+        The validated specification to render.
+    format:
+        ``"svg"`` (default) returns ``image/svg+xml``.
+        ``"png"``  returns ``image/png`` rendered via Pillow.
+    """
+    if format == "png":
+        data = PNGRenderer().render(spec)
+        return Response(content=data, media_type="image/png")
     svg = SVGRenderer().render(spec)
     return Response(content=svg, media_type="image/svg+xml")
 
@@ -49,15 +62,22 @@ def _render(spec: VisualSpecification) -> Response:
     "/render",
     response_class=Response,
     status_code=200,
-    summary="Render a VisualSpecification to SVG",
+    summary="Render a VisualSpecification to SVG or PNG",
     description=(
-        "Accepts a validated ``VisualSpecification`` JSON body, renders it to an "
-        "SVG document, and returns the SVG (content-type ``image/svg+xml``)."
+        "Accepts a validated ``VisualSpecification`` JSON body, renders it to SVG "
+        "(default, ``?format=svg``) or PNG (``?format=png`` via Pillow), and "
+        "returns the image."
     ),
-    response_description="An SVG document representing the specification.",
+    response_description="An SVG or PNG document representing the specification.",
 )
-async def render_visual(spec: VisualSpecification) -> Response:
-    return _render(spec)
+async def render_visual(
+    spec: VisualSpecification,
+    format: str = "svg",
+) -> Response:
+    """Render a caller-supplied specification to SVG or PNG."""
+    if format not in ("svg", "png"):
+        raise HTTPException(status_code=400, detail="format must be 'svg' or 'png'")
+    return _render(spec, format=format)
 
 
 # ── Plan + render from a natural-language prompt ────────────────────────────
@@ -66,17 +86,19 @@ async def render_visual(spec: VisualSpecification) -> Response:
     "/plan",
     response_class=Response,
     status_code=200,
-    summary="Plan a visual from a prompt and render it to SVG",
+    summary="Plan a visual from a prompt and render it to SVG or PNG",
     description=(
         "Accepts a natural-language prompt (plus optional visual_type and "
         "complexity), uses the AI Planner Agent to produce a validated "
-        "``VisualSpecification``, renders it to SVG, and returns the SVG "
-        "(content-type ``image/svg+xml``). The LLM provider is injected via "
+        "``VisualSpecification``, renders it to SVG or PNG, and returns the "
+        "image.  Pass ``?format=svg`` (default) for ``image/svg+xml`` or "
+        "``?format=png`` for ``image/png`` (rendered via Pillow, no native "
+        "graphics library required).  The LLM provider is injected via "
         "``get_text_generator`` and is configurable through environment "
         "variables. Returns 503 when no provider is configured, 502 when the "
         "LLM output cannot be turned into a valid specification."
     ),
-    response_description="An SVG document produced from the planned specification.",
+    response_description="An SVG or PNG document produced from the planned specification.",
     responses={
         502: {"description": "Planning failed (invalid/empty AI output)."},
         503: {"description": "LLM provider not configured."},
@@ -85,7 +107,10 @@ async def render_visual(spec: VisualSpecification) -> Response:
 async def plan_and_render(
     request: GenerationRequest,
     text_generator: Optional[TextGenerator] = Depends(get_text_generator),
+    format: str = "svg",
 ) -> Response:
+    if format not in ("svg", "png"):
+        raise HTTPException(status_code=400, detail="format must be 'svg' or 'png'")
     if text_generator is None:
         raise HTTPException(
             status_code=503,
@@ -117,7 +142,7 @@ async def plan_and_render(
         )
 
     spec: VisualSpecification = result.data
-    return _render(spec)
+    return _render(spec, format=format)
 
 
 # ── Sample endpoints ──────────────────────────────────────────────────────────

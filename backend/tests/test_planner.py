@@ -397,3 +397,125 @@ class TestComplexityScaling:
         assert len(spec.shapes) >= 4
         assert len(spec.text) >= 4
         assert len(spec.connections) >= 5
+
+
+# ── PNG endpoint tests ───────────────────────────────────────────────────────
+
+
+class TestPlanPngEndpoint:
+    """Tests for ``POST /api/plan?format=png``."""
+
+    _PNG_SIG = b"\x89PNG\r\n\x1a\n"
+
+    async def test_plan_png_returns_png(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """``format=png`` should return a valid PNG image."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan?format=png",
+            json={
+                "prompt": "Create an infographic explaining the water cycle.",
+                "visual_type": "complexity_image",
+                "complexity": "high",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content[:8] == self._PNG_SIG
+
+    async def test_plan_svg_default(
+        self, client: AsyncClient, override_llm, make_text_generator
+    ) -> None:
+        """Without ``format``, the endpoint returns SVG (backward compat)."""
+        gen = make_text_generator([VALID_SPEC_JSON])
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan",
+            json={
+                "prompt": "Create an infographic about solar energy.",
+                "visual_type": "infographic",
+                "complexity": "medium",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert response.text.startswith("<svg")
+
+    async def test_plan_svg_explicit(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """``format=svg`` explicitly returns SVG."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan?format=svg",
+            json={
+                "prompt": "Create an infographic about renewable energy.",
+                "visual_type": "complexity_image",
+                "complexity": "medium",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+
+    async def test_plan_invalid_format_returns_400(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """An invalid format value should return 400."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan?format=gif",
+            json={
+                "prompt": "Create an infographic about solar energy.",
+                "visual_type": "infographic",
+                "complexity": "medium",
+            },
+        )
+        assert response.status_code == 400
+
+    async def test_plan_png_low_complexity(
+        self, client: AsyncClient, override_llm
+    ) -> None:
+        """PNG output with low complexity should still be a valid PNG."""
+        gen = MockTextGenerator()
+        override_llm(gen)
+
+        response = await client.post(
+            "/api/plan?format=png",
+            json={
+                "prompt": "Create an infographic about solar energy.",
+                "visual_type": "complexity_image",
+                "complexity": "low",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content[:8] == self._PNG_SIG
+
+    async def test_render_png_endpoint(self, client: AsyncClient) -> None:
+        """``POST /api/render?format=png`` should return PNG for a spec."""
+        spec_dict = json.loads(VALID_SPEC_JSON)
+        response = await client.post(
+            "/api/render?format=png",
+            json=spec_dict,
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content[:8] == self._PNG_SIG
+
+    async def test_render_default_svg(self, client: AsyncClient) -> None:
+        """``POST /api/render`` (default) should return SVG."""
+        spec_dict = json.loads(VALID_SPEC_JSON)
+        response = await client.post(
+            "/api/render",
+            json=spec_dict,
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
