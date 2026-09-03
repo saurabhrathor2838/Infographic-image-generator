@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from app.api.routes.health import router as health_router
 from app.api.routes.generation import router as generation_router
 from app.api.routes.visualization import router as visualization_router
+from app.api.routes.revisions import router as revisions_router
 
 # Master API router — included by ``app.main:app``.
 api_router: APIRouter = APIRouter(prefix="/api")
@@ -25,6 +26,9 @@ api_router.include_router(generation_router, tags=["generation"])
 
 # Visualization / rendering endpoints
 api_router.include_router(visualization_router, tags=["visualization"])
+
+# Revision / template endpoints (Phase 12)
+api_router.include_router(revisions_router, tags=["revisions"])
 
 # Future route modules will be added here:
 #   from app.api.routes.images import router as image_router

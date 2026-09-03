@@ -1,62 +1,23 @@
 /**
  * API contract types for the AI Visual Generator backend.
  *
- * These mirror the Pydantic response schemas returned by the FastAPI
- * endpoints ``GET /api/health`` and ``POST /api/generate``.  Keeping them in
- * one place gives the frontend a single source of truth for the response
- * shape returned by the backend.
+ * These mirror the Pydantic response/request schemas returned by the FastAPI
+ * endpoints.  Keeping them in one place gives the frontend a single source of
+ * truth for the shapes exchanged with the backend.
  *
- * The ``POST /api/plan`` endpoint (Phase 6) returns an SVG document
- * (``image/svg+xml``) on success, or a JSON error body on failure — see
- * ``ApiErrorResponse`` for the error shape.
- */
-
-/** Lifecycle status of a generation request (mirrors the backend enum). */
-export type GenerationStatus =
-  | "pending"
-  | "planning"
-  | "generating"
-  | "critiquing"
-  | "revising"
-  | "complete"
-  | "failed";
-
-/**
- * The ``result`` payload embedded inside a generation response.
+ * Phase 12 integration
+ * --------------------
+ * The frontend consumes three Phase 12 endpoints:
+ *   - ``GET  /api/health``        → :interface:`HealthResponse`
+ *   - ``GET  /api/templates``     → :interface:`TemplatesResponse`
+ *   - ``POST /api/revisions``     → :interface:`RevisionResponse`
  *
- * ``mock`` is ``true`` while image generation is simulated (Phase 2/3) and
- * will become ``false`` once real providers are wired up (Phase 4+).
+ * ``POST /api/revisions`` accepts the fields of :interface:`RevisionRequest`
+ * and returns a :interface:`RevisionResponse` containing the rendered SVG, a
+ * base64-encoded PNG, a :class:`QualityReport`, the revision count and the
+ * overall pass/fail status.  All image generation is pure-Python on the
+ * backend — no paid image APIs are involved.
  */
-export interface GenerationResultData {
-  visual_type: string;
-  complexity: string;
-  routing: string;
-  plan: Record<string, unknown> | null;
-  iterations: number;
-  final_image: unknown | null;
-  mock: boolean;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-/** Shape of the body returned by ``POST /api/generate``. */
-export interface GenerationResponse {
-  success: boolean;
-  timestamp: string;
-  request_id: string;
-  status: GenerationStatus;
-  visual_type: string;
-  message: string;
-  result: GenerationResultData | null;
-}
-
-/** Shape of the body returned by ``GET /api/health``. */
-export interface HealthResponse {
-  success: boolean;
-  timestamp: string;
-  status: string;
-  service: string;
-}
 
 /** A single field-level validation error from FastAPI (422 responses). */
 export interface ApiValidationError {
@@ -70,5 +31,64 @@ export interface ApiErrorResponse {
   success?: boolean;
   error?: string;
   details?: string;
-  detail?: ApiValidationError[];
+  detail?: string | ApiValidationError[];
+}
+
+/** Shape of the body returned by ``GET /api/health``. */
+export interface HealthResponse {
+  success: boolean;
+  timestamp: string;
+  status: string;
+  service: string;
+}
+
+/** Metadata about a single template (from ``GET /api/templates``). */
+export interface TemplateInfo {
+  name: string;
+  display_name: string;
+  description: string;
+}
+
+/** A single visual-type or complexity option returned by ``GET /api/templates``. */
+export interface OptionItem {
+  value: string;
+  label: string;
+}
+
+/** Shape of the body returned by ``GET /api/templates``. */
+export interface TemplatesResponse {
+  templates: TemplateInfo[];
+  visual_types: OptionItem[];
+  complexities: OptionItem[];
+}
+
+/** Serialized :class:`QualityReport` from ``POST /api/revisions``. */
+export interface QualityReportData {
+  passed: boolean;
+  score: number;
+  issues: string[];
+  warnings: string[];
+  suggestions: string[];
+}
+
+/** Request payload for ``POST /api/revisions``. */
+export interface RevisionRequest {
+  prompt: string;
+  visual_type?: string;
+  complexity?: string;
+  template?: string | null;
+}
+
+/** Response returned by ``POST /api/revisions`` (Phase 12). */
+export interface RevisionResponse {
+  success: boolean;
+  svg: string;
+  png_base64: string | null;
+  quality_report: QualityReportData;
+  revisions: number;
+  passed: boolean;
+  template: string;
+  visual_type: string;
+  complexity: string;
+  prompt: string;
 }
